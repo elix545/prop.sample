@@ -15,10 +15,23 @@ public class clsProp {
 	private Properties prop;
 	private enmType type;
 	private byte[] digestKey;
+	private boolean isUpdated = false;
 
 	public enum enmType {
 		Properties, XML
 	}
+
+	private static String ENV_PREFIX = System.getenv("PROP_ENV_PREFIX");
+
+	private static String DEFAULT_FILE_NAME = "config";
+	private static String EXT_SEPARATOR = ".";
+	private static String EXT_POPERTIES = "properties";
+	private static String EXT_XML = "xml";
+
+	private static String CONFIG_POPERTIES = (ENV_PREFIX == null) ? DEFAULT_FILE_NAME + EXT_SEPARATOR + EXT_POPERTIES
+			: DEFAULT_FILE_NAME + EXT_SEPARATOR + ENV_PREFIX + EXT_SEPARATOR + EXT_POPERTIES;
+	private static String CONFIG_XML = (ENV_PREFIX == null) ? DEFAULT_FILE_NAME + EXT_SEPARATOR + EXT_XML
+			: DEFAULT_FILE_NAME + EXT_SEPARATOR + ENV_PREFIX + EXT_SEPARATOR + EXT_XML;
 
 	private void fillDigestKey() {
 		if (this.digestKey == null) {
@@ -29,7 +42,6 @@ public class clsProp {
 			} else {
 				this.digestKey = strDigestKey.getBytes();
 			}
-
 		}
 	}
 
@@ -37,10 +49,12 @@ public class clsProp {
 		this.prop = new Properties();
 		this.type = enmType.Properties;
 
+		this.isUpdated = false;
+
 		if (type == enmType.Properties) {
-			filePath = "config.properties";
+			filePath = CONFIG_POPERTIES;
 		} else {
-			filePath = "config.xml";
+			filePath = CONFIG_XML;
 		}
 	}
 
@@ -49,6 +63,8 @@ public class clsProp {
 		this.prop = new Properties();
 		this.filePath = filePath;
 		this.setPath(filePath);
+
+		this.isUpdated = false;
 	}
 
 	public clsProp(String filePath, enmType type) {
@@ -57,17 +73,28 @@ public class clsProp {
 		this.filePath = filePath;
 		this.type = type;
 		this.setPath(filePath);
+
+		this.isUpdated = false;
 	}
 
 	public void setPath(String path) {
 		if (path == null || path.length() == 0) {
 			if (type == enmType.Properties) {
-				filePath = "config.properties";
+				filePath = CONFIG_POPERTIES;
 			} else {
-				filePath = "config.xml";
+				filePath = CONFIG_XML;
 			}
 		} else {
 			filePath = path;
+		}
+
+		if (filePath.endsWith(EXT_SEPARATOR.concat(EXT_POPERTIES))) {
+			this.type = enmType.Properties;
+		} else if (filePath.endsWith(EXT_SEPARATOR.concat(EXT_XML))) {
+			this.type = enmType.XML;
+		} else {
+			filePath = filePath.concat("/").concat(CONFIG_POPERTIES);
+			this.type = enmType.Properties;
 		}
 	}
 
@@ -98,10 +125,10 @@ public class clsProp {
 		try {
 			InputStream input;
 			if (type == enmType.Properties) {
-				input = this.getClass().getClassLoader().getResourceAsStream("config.properties");
+				input = this.getClass().getClassLoader().getResourceAsStream(CONFIG_POPERTIES);
 				prop.load(input);
 			} else {
-				input = this.getClass().getClassLoader().getResourceAsStream("config.xml");
+				input = this.getClass().getClassLoader().getResourceAsStream(CONFIG_XML);
 				prop.loadFromXML(input);
 			}
 
@@ -133,6 +160,8 @@ public class clsProp {
 				value = "<" + value + ">";
 				prop.setProperty(key, value);
 				value = crypVal;
+
+				this.isUpdated = true;
 			}
 		}
 		return value;
@@ -140,13 +169,16 @@ public class clsProp {
 
 	public boolean storeProp() {
 		try {
-			OutputStream output;
-			if (type == enmType.Properties) {
-				output = new FileOutputStream(filePath);
-				prop.store(output, null);
-			} else {
-				output = new FileOutputStream(filePath);
-				prop.storeToXML(output, null, "UTF-8");
+			if (this.isUpdated) {
+				OutputStream output;
+				if (type == enmType.Properties) {
+					output = new FileOutputStream(filePath);
+					prop.store(output, null);
+				} else {
+					output = new FileOutputStream(filePath);
+					prop.storeToXML(output, null, "UTF-8");
+				}
+				this.isUpdated = false;
 			}
 			return true;
 		} catch (IOException e) {
@@ -179,6 +211,7 @@ public class clsProp {
 		} else {
 			prop.setProperty(key, value);
 		}
+		this.isUpdated = true;
 	}
 
 }
